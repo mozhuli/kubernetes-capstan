@@ -1,0 +1,38 @@
+{
+    "Description": "propeller",
+    "ResultsDir": "/tmp/propeller",
+    "CapstanEndpoint": "user_machine_ip:8081",
+    "Server": {
+        "advertiseaddress": "propeller:8080",
+        "bindaddress": "0.0.0.0",
+        "bindport": 8080,
+        "timeoutseconds": 5400
+    },
+    "Steps": 10,
+    "Sampling": 5,
+    "Workload": [
+        {
+            "name": "http-test",
+            "type": "wrk",
+            "image": "nginx:17.9",
+            "Steps": 5,
+            "testCaseSet": {
+                "benchmarkPodIPSameNode": true,
+                "benchmarkVIPSameNode": true,
+                "benchmarkPodIPDiffNode": true,
+                "benchmarkVIPDiffNode": true
+            }
+        },
+        {
+            "name": "network-test1",
+            "type": "iperf",
+            "Steps": 5,
+            "testCaseSet": {
+                "benchmarkTCPSameNode": true,
+                "benchmarkUDPSameNode": true,
+                "benchmarkTCPDiffNode": true,
+                "benchmarkUDPDiffNode": true
+            }
+        }
+    ]
+}

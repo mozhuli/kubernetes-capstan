@@ -1,0 +1,142 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: propeller
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    component: propeller
+  name: propeller-serviceaccount
+  namespace: propeller
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRoleBinding
+metadata:
+  labels:
+    component: propeller
+  name: propeller-serviceaccount
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: propeller-serviceaccount
+subjects:
+- kind: ServiceAccount
+  name: propeller-serviceaccount
+  namespace: propeller
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRole
+metadata:
+  labels:
+    component: propeller
+  name: propeller-serviceaccount
+  namespace: propeller
+rules:
+- apiGroups:
+  - '*'
+  resources:
+  - '*'
+  verbs:
+  - '*'
+---
+apiVersion: v1
+data:
+  config.json: |
+    {
+        "Description": "propeller",
+        "ResultsDir": "/tmp/propeller",
+        "CapstanEndpoint": "user_machine_ip:8081",
+        "Steps": 10,
+        "Sampling": 5,
+        "Server": {
+            "advertiseaddress": "propeller:8080",
+            "bindaddress": "0.0.0.0",
+            "bindport": 8080,
+            "timeoutseconds": 5400
+        },
+        "Workload": [
+          {
+            "name": "http-test",
+            "type": "wrk",
+            "image": "nginx:17.9",
+            "Steps": 5,
+            "testCaseSet": {
+              "benchmarkPodIPSameNode": true,
+              "benchmarkVIPSameNode": true,
+              "benchmarkPodIPDiffNode": true,
+              "benchmarkVIPDiffNode": true
+            }
+          },
+          {
+            "name": "network-test1",
+            "type": "iperf",
+            "Steps": 5,
+            "testCaseSet": {
+              "benchmarkTCPSameNode": true,
+              "benchmarkUDPSameNode": true,
+              "benchmarkTCPDiffNode": true,
+              "benchmarkUDPDiffNode": true
+            }
+          }
+        ]
+    }
+kind: ConfigMap
+metadata:
+  labels:
+    component: propeller
+  name: propeller-config-cm
+  namespace: propeller
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    component: propeller
+  name: propeller
+  namespace: propeller
+spec:
+  containers:
+  - command:
+    - /bin/bash
+    - -c
+    - /propeller --no-exit=true -v 3 --logtostderr
+    env:
+    - name: PROPELLER_ADVERTISE_IP
+      valueFrom:
+        fieldRef:
+          fieldPath: status.podIP
+    image: wadelee/propeller:v0.1
+    imagePullPolicy: IfNotPresent
+    name: propeller
+    volumeMounts:
+    - mountPath: /etc/propeller
+      name: propeller-config-volume
+    - mountPath: /tmp/propeller
+      name: output-volume
+  restartPolicy: Never
+  serviceAccountName: propeller-serviceaccount
+  volumes:
+  - configMap:
+      name: propeller-config-cm
+    name: propeller-config-volume
+  - emptyDir: {}
+    name: output-volume
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    component: propeller
+  name: propeller
+  namespace: propeller
+spec:
+  ports:
+  - port: 8080
+    protocol: TCP
+    targetPort: 8080
+  selector:
+    component: propeller
+  type: ClusterIP
+---
